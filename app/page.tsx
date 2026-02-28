@@ -17,9 +17,10 @@ export default function VaultPage() {
       const id = await hashPassword(password);
       const encrypted = await encryptMessage(message, password);
       await fetch("/api/vault", {
-        method: "POST",
-        body: JSON.stringify({ id, content: encrypted }),
-      });
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ id, content: encrypted }),
+});
       alert("Message secured in the vault!");
       setMessage("");
     } catch (e) { alert("Error saving message"); }
