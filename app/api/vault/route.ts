@@ -1,4 +1,3 @@
-// app/api/vault/route.ts
 import { Redis } from "@upstash/redis";
 import { NextResponse } from "next/server";
 
@@ -8,23 +7,24 @@ const redis = new Redis({
 });
 
 export async function POST(req: Request) {
-  const { id, content } = await req.json();
-  // Save message for 24 hours (86400 seconds)
-  await redis.set(id, content, { ex: 86400 });
-  return NextResponse.json({ success: true });
+  try {
+    const { id, content } = await req.json();
+    await redis.set(id, content, { ex: 86400 }); // 24 hour expiry
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+  }
 }
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
-
-  if (!id) return NextResponse.json({ error: "No ID" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
 
   const data = await redis.get(id);
   if (data) {
-    await redis.del(id); // SHRED AFTER READING
+    await redis.del(id); // DELETE IMMEDIATELY
     return NextResponse.json({ content: data });
   }
-
-  return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ error: "Empty or Expired" }, { status: 404 });
 }
