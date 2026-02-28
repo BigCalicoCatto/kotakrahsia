@@ -1,84 +1,93 @@
 "use client";
 import { useState } from "react";
+import { Shield, Lock, Unlock, Trash2, Globe } from "lucide-react";
 import { encryptMessage, decryptMessage, hashPassword } from "@/lib/crypto";
 
 export default function VaultPage() {
   const [accepted, setAccepted] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
-  const [result, setResult] = useState("");
+  const [decryptedMsg, setDecryptedMsg] = useState("");
 
-  const handleDeposit = async () => {
-    const id = await hashPassword(password);
-    const encrypted = await encryptMessage(message, password);
-    await fetch("/api/vault", {
-      method: "POST",
-      body: JSON.stringify({ id, content: encrypted }),
-    });
-    alert("Message Dropped in Vault!");
-    setMessage("");
+  const onDeposit = async () => {
+    if (!password || !message) return alert("Fill all fields");
+    setLoading(true);
+    try {
+      const id = await hashPassword(password);
+      const encrypted = await encryptMessage(message, password);
+      await fetch("/api/vault", {
+        method: "POST",
+        body: JSON.stringify({ id, content: encrypted }),
+      });
+      alert("Message secured in the vault!");
+      setMessage("");
+    } catch (e) { alert("Error saving message"); }
+    setLoading(false);
   };
 
-  const handleWithdraw = async () => {
-    const id = await hashPassword(password);
-    const res = await fetch(`/api/vault?id=${id}`);
-    const data = await res.json();
-    if (data.content) {
-      const decrypted = await decryptMessage(data.content, password);
-      setResult(decrypted);
-    } else {
-      alert("No message found or already destroyed.");
-    }
+  const onWithdraw = async () => {
+    if (!password) return alert("Enter key");
+    setLoading(true);
+    try {
+      const id = await hashPassword(password);
+      const res = await fetch(`/api/vault?id=${id}`);
+      const data = await res.json();
+      if (data.content) {
+        const text = await decryptMessage(data.content, password);
+        setDecryptedMsg(text);
+      } else { alert("Vault empty for this key."); }
+    } catch (e) { alert("Wrong key or expired."); }
+    setLoading(false);
   };
 
   if (!accepted) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-black text-white p-10">
-        <h1 className="text-3xl font-bold mb-4">THE VAULT</h1>
-        <p className="text-center mb-6 max-w-md">
-          Zero-Knowledge Encryption. Messages self-destruct after reading.
-          We do not log IPs. You are responsible for your keys.
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-zinc-400 p-6">
+        <Shield size={48} className="text-white mb-6" />
+        <h1 className="text-2xl font-bold text-white mb-2 tracking-widest">THE VAULT</h1>
+        <p className="text-center max-w-sm mb-8 text-sm leading-relaxed">
+          Zero-knowledge encryption. Messages are deleted instantly after decryption. We do not track you.
         </p>
-        <button 
-          onClick={() => setAccepted(true)}
-          className="bg-white text-black px-6 py-2 rounded font-bold"
-        >
-          I AGREE - ENTER
+        <button onClick={() => setAccepted(true)} className="px-10 py-3 bg-white text-black font-bold rounded-full hover:bg-zinc-200 transition">
+          I AGREE
         </button>
       </div>
     );
   }
 
   return (
-    <main className="p-10 bg-zinc-900 min-h-screen text-white flex flex-col items-center">
-      <div className="w-full max-w-md space-y-4">
-        <input
-          type="password"
-          placeholder="Private Key"
-          className="w-full p-2 bg-zinc-800 rounded border border-zinc-700"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        
-        <div className="border-t border-zinc-800 pt-4">
-          <textarea
-            placeholder="Type secret message..."
-            className="w-full p-2 bg-zinc-800 rounded h-32"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <button onClick={handleDeposit} className="w-full bg-blue-600 mt-2 py-2 rounded">
-            Deposit (Lock & Drop)
+    <main className="min-h-screen bg-zinc-950 text-white p-6 md:p-12 font-sans">
+      <div className="max-w-md mx-auto space-y-8">
+        <header className="flex items-center gap-2 border-b border-zinc-800 pb-4">
+          <Globe size={20} className="text-blue-500" />
+          <span className="text-xs font-mono text-zinc-500">MALAYSIA HUB // GLOBAL VAULT</span>
+        </header>
+
+        <div className="space-y-2">
+          <label className="text-xs uppercase tracking-widest text-zinc-500">Private Key</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full p-3 bg-zinc-900 border border-zinc-800 rounded focus:border-blue-600 outline-none" placeholder="••••••••" />
+        </div>
+
+        <div className="p-4 border border-zinc-800 rounded-lg bg-zinc-900/50 space-y-4">
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} className="w-full bg-transparent outline-none h-24 text-sm" placeholder="Write your secret message here..." />
+          <button disabled={loading} onClick={onDeposit} className="w-full py-3 bg-blue-600 rounded font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition">
+            <Lock size={16} /> {loading ? "Encrypting..." : "Lock & Drop"}
           </button>
         </div>
 
-        <div className="border-t border-zinc-800 pt-4">
-          <button onClick={handleWithdraw} className="w-full bg-red-600 py-2 rounded">
-            Withdraw (Unlock & Burn)
+        <div className="pt-4 border-t border-zinc-800">
+          <button disabled={loading} onClick={onWithdraw} className="w-full py-3 bg-zinc-100 text-black rounded font-bold flex items-center justify-center gap-2 hover:bg-white transition">
+            <Unlock size={16} /> {loading ? "Searching..." : "Withdraw & Burn"}
           </button>
-          {result && (
-            <div className="mt-4 p-4 bg-zinc-800 border border-green-500 text-green-400">
-              <strong>Message:</strong> {result}
+          
+          {decryptedMsg && (
+            <div className="mt-6 p-4 border border-green-900 bg-green-950/30 rounded">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-green-500 font-mono tracking-tighter uppercase">Message Retrieved</span>
+                <Trash2 size={12} className="text-green-500" />
+              </div>
+              <p className="text-green-400 break-words">{decryptedMsg}</p>
             </div>
           )}
         </div>
